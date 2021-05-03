@@ -1,11 +1,11 @@
 #-------------------------------------------------------------------------------
 # Name:        AutoJournal
-# Purpose:     Automate Journal (Odoo)
+# Purpose:     Automate Kasbon/GL Journal (Odoo)
 #
-# Author:      reza_aldama
+# Author:      rezaaldama
 #
 # Created:     04/06/2020
-# Copyright:   (c) Reza Adita Aldama 2020
+# Copyright:   <None>
 # Licence:     <None>
 #-------------------------------------------------------------------------------
 
@@ -14,122 +14,112 @@ from helium import wait_until
 from helium import press
 from helium import Text
 from helium import Button
-from helium import click as helium_click
+from helium import click as h_click
 from helium import start_chrome
-
 from selenium.webdriver.common.keys import Keys
-
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
-
 from time import sleep
 
+#-------------------------------------------------------------------------------
 
-def RE(kasbon, mode='re_direct'):
+TAX = True
+
+REIMBURSE = 10
+REIMBURSE_PAYABLE = 11
+GROSSUP = 12
+BPJS = 13
+LABOUR = 14
+SALARY = 15
+OTHERS = 16
+
+def RE(kasbon, TAX=False, mode=REIMBURSE):
     """ To Automate Reimburse Kasbon """
+
     project, partner, company = write_kasbon(kasbon, mode)
-    edit_kasbon('reimburse')
-    edit_kasbon('date')
+    edit_kasbon(mode)
     submit_kasbon()
-    balance_kasbon(mode, project=project)
-    print_kasbon(mode, partner, project, company)
-def REP(kasbon):
-    RE(kasbon, mode='re_indirect')
+    balance_kasbon(mode, project = project)
+    print_kasbon(mode, partner, project, company, TAX)
+
+def REP(kasbon, TAX=False): RE(kasbon, TAX, mode=REIMBURSE_PAYABLE)
 
 def ARE(mode=None):
     """ To Automate Reimburse Kasbons """
+
     update_kasbon()
     update_entries()
-    for kasbon in kasbons:
-        RE(kasbon, mode)
-def AGJ():
-    ARE(mode='grossup')
-def ABJ():
-    ARE(mode='bpjsk')
-def ALJ():
-    ARE(mode='labour')
-def ASJ():
-    ARE(mode='salary')
-def AMJ():
-    ARE(mode='modified')
 
-def CO(kasbon, tax=False, mode='co_direct'):
+    for kasbon in kasbons:
+        RE(kasbon, mode=mode)
+
+def AGJ(): ARE(mode=GROSSUP)
+def ABJ(): ARE(mode=BPJS)
+def ALJ(): ARE(mode=LABOUR)
+def ASJ(): ARE(mode=SALARY)
+def AOJ(): ARE(mode=OTHERS)
+
+#-------------------------------------------------------------------------------
+
+CASHOUT = 21
+CASHOUT_PAYABLE = 22
+
+def CO(kasbon, TAX=False, mode=CASHOUT):
     """ To Automate Cash Out Kasbon """
+
     project, partner, company = write_kasbon(kasbon, mode)
     submit_kasbon()
-    pay_kasbon(mode, tax, project, company)
-    print_kasbon(mode, partner, project, company)
-def COP(kasbon, tax=False):
-    CO(kasbon, tax, mode='co_indirect')
-TAX=True
+    pay_kasbon(mode, project, company, TAX)
+    print_kasbon(mode, partner, project, company, TAX)
 
-def RP(kasbon, status, mode='responsibility'):
+def COP(kasbon, TAX=False): CO(kasbon, TAX, mode=CASHOUT_PAYABLE)
+
+#-------------------------------------------------------------------------------
+
+BALANCE = 30
+BALANCE_RECEIVABLE = 31
+BALANCE_PAYABLE = 32
+
+def RPB(kasbon, mode=BALANCE):
     """ To Automate Responsibility Kasbon """
+
     project, partner, company = write_kasbon(kasbon, mode)
-    balance_kasbon(mode, status=status)
-    print_kasbon(mode, partner, project, company, status)
-def RPR(kasbon):
-    RP(kasbon, status='receivable')
-def RPP(kasbon):
-    RP(kasbon, status='payable')
-def RPB(kasbon):
-    RP(kasbon, status='bank')
+    balance_kasbon(mode)
+    print_kasbon(mode, partner, project, company)
 
+def RPR(kasbon): RPB(kasbon, BALANCE_RECEIVABLE)
+def RPP(kasbon): RPB(kasbon, BALANCE_PAYABLE)
 
-def entry(string, xpath=None, t=0):
+#-------------------------------------------------------------------------------
 
-    if (not xpath):
+BUTTON = ["Edit", "Import", "Report Balancing", "Post Balance", "Reverse Entry",
+          "Post", "Cancel Entry", "Entries", "Discard", "Journal Entries"]
 
-        if (string == date):
-            xpath = "//div[@name='date']"
+def wait(string=None):
 
-        elif (string == bank):
+    if string in BUTTON:
 
-            xpath = """//div[contains(@class,'o_required_modifier')]
-                        [contains(@name,'journal_id')]"""
+        if (string == "Post" or
+            string == "Cancel Entry" or
+            string == 'Import' or
+            string == 'Entries' or
+            string == 'Discard' or
+            string == 'Journal Entries' or
+            string == 'Add an Item'):
 
-        else:
-            if (string[:4] == '1181'):
-                xpath = """//div[contains(@class,'o_required_modifier')]
-                        [contains(@name,'expense_account_id')]"""
-            else:
-                xpath = """//div[contains(@class,'o_required_modifier')]
-                        [contains(@name,'diff_account_id')]"""
+            sleep(1)
+
+            WebDriverWait(driver,999).until(EC.presence_of_element_located(
+                (By.XPATH, "//body[@class='o_web_client']")))
+
+        wait_until(Button(string).exists,999)
 
     else:
+        wait_until(Text(string).exists,999)
 
-        temp = xpath
-
-        if (string == 'account'):
-            xpath = "//tr[@class='o_data_row o_selected_row']/td[1]"
-
-        elif (string == 'partner'):
-            xpath = "//tr[@class='o_data_row o_selected_row']/td[2]"
-
-        elif (string == 'label'):
-            xpath = "//tr[@class='o_data_row o_selected_row']/td[3]"
-
-        elif (string == 'project'):
-            xpath = "//tr[@class='o_data_row o_selected_row']/td[5]"
-
-        elif (string == 'nominal'):
-            xpath = "//tr[@class='o_data_row o_selected_row']/td[9]"
-
-        string = temp
-
-    xpath = driver.find_element_by_xpath(xpath + '//input')
-
-    xpath.click()
-    xpath.send_keys(Keys.CONTROL + 'a')
-    xpath.send_keys(string)
-    sleep(0.5+t)
-    if (t > 0):
-        press(Keys.ENTER)
-        sleep(0.5)
-
-def click(string, t=0):
+def click(string):
 
     try:
         driver.find_element_by_xpath("//*[text()='" + string + "']").click()
@@ -141,20 +131,69 @@ def click(string, t=0):
             try:
                 driver.find_element_by_class_name(string).click()
             except:
-                helium_click(string)
+                h_click(string)
 
-    sleep(0.35+t)
+#-------------------------------------------------------------------------------
 
-def wait(string, mode=False):
+ACCOUNT = 1
+PARTNER = 2
+LABEL = 3
+PROJECT = 4
+NOMINAL = 5
 
-    if mode:
-        wait_until(Button(string).exists,999)
+DIFF_ACCOUNT = 6
+
+def entry(mode, string=None, t=0):
+
+    if not string:
+
+        if mode == DATE:
+            xpath = "//div[@name='date']//input"
+
+        elif mode == BANK:
+            xpath = """//div[contains(@class,'o_required_modifier')]
+                        [contains(@name,'journal_id')]//input"""
+
+        else:
+            xpath = "//input[@class='o_searchview_input']"
+
+        string = mode
+
     else:
-        wait_until(Text(string).exists,999)
 
-    sleep(0.35+t)
-button = True
+        if mode == DIFF_ACCOUNT:
+            try:
+                xpath = """//div[contains(@class,'o_required_modifier')]
+                        [contains(@name,'expense_account_id')]//input"""
+            except:
+                xpath = """//div[contains(@class,'o_required_modifier')]
+                        [contains(@name,'diff_account_id')]//input"""
 
+        elif mode == ACCOUNT:
+            xpath = "//tr[@class='o_data_row o_selected_row']/td[1]//input"
+
+        elif mode == PARTNER:
+            xpath = "//tr[@class='o_data_row o_selected_row']/td[2]//input"
+
+        elif mode == LABEL:
+            xpath = "//tr[@class='o_data_row o_selected_row']/td[3]//input"
+
+        elif mode == PROJECT:
+            xpath = "//tr[@class='o_data_row o_selected_row']/td[5]//input"
+
+        elif mode == NOMINAL:
+            xpath = "//tr[@class='o_data_row o_selected_row']/td[9]//input"
+
+    xpath = driver.find_element_by_xpath(xpath)
+
+    xpath.click()
+    xpath.send_keys(Keys.CONTROL + 'a')
+    xpath.send_keys(string)
+    sleep(0.5+t)
+
+    if t > 0:
+        xpath.send_keys(Keys.ENTER)
+        sleep(0.5)
 
 kasbons = []
 def update_kasbon():
@@ -165,14 +204,15 @@ def update_kasbon():
 
 entries = {}
 def update_entries(
-    status=None, partner=None, label=None, project=None, nominal=None):
+    mode=None, partner=None, label=None, project=None, nominal=None):
 
-    if status == 'receivable':
+    if mode == BALANCE_RECEIVABLE:
         entries[len(entries)] = ['1150-999', partner, label, project, nominal]
-    elif status == 'payable':
+
+    elif mode == BALANCE_PAYABLE:
         entries[len(entries)] = ['2170-009', partner, label, project, -nominal]
 
-    elif not status:
+    elif not mode:
         with open("journal_entries.txt") as f:
             for line in f:
                 line_split = line.split("\t")
@@ -194,23 +234,24 @@ def auto_entries(project=None, mode=False, entries=entries):
                         project != 'description' and
                         project != 'partner')):
 
-                    click('Add an item', t=1+t)
+                    click('Add an item')
+                    wait('Discard')
 
-                    entry('account', entries['account'][n], t=0.65)
+                    entry(ACCOUNT, entries['account'][n], t=1+t)
 
                     if (entries['partner'][n] != '0'):
-                        entry('partner', entries['partner'][n], t=0.65)
+                        entry(PARTNER, entries['partner'][n], t=1+t)
 
-                    entry('label', entries['description'][n])
+                    entry(LABEL, entries['description'][n])
 
-                    entry('project', project, t=0.65)
+                    entry(PROJECT, project, t=1+t)
 
                     if (int(entries[project][n]) < 0):
-                        entry('nominal', str(entries[project][n])[1:])
+                        entry(NOMINAL, str(entries[project][n])[1:])
                         press(Keys.TAB)
                         write('0')
                     elif (int(entries[project][n]) > 0):
-                        entry('nominal', '0')
+                        entry(NOMINAL, '0')
                         press(Keys.TAB)
                         write(entries[project][n])
 
@@ -221,31 +262,36 @@ def auto_entries(project=None, mode=False, entries=entries):
 
         for n in entries:
 
-            click('Add an item', t=1+t)
+            click('Add an item')
+            wait('Discard')
 
-            entry('account', entries[n][0], t=0.65)
+            entry(ACCOUNT, entries[n][0], t=1+t)
 
-            entry('partner', entries[n][1], t=0.65)
+            entry(PARTNER, entries[n][1], t=1+t)
 
-            entry('label', entries[n][2])
+            entry(LABEL, entries[n][2])
 
-            entry('project', entries[n][3], t=0.65)
+            entry(PROJECT, entries[n][3], t=1+t)
 
             if (int(entries[n][4]) < 0):
-                entry('nominal', str(entries[n][4])[1:])
+                entry(NOMINAL, str(entries[n][4])[1:])
                 press(Keys.TAB)
                 write('0')
             elif (int(entries[n][4]) > 0):
-                entry('nominal','0')
+                entry(NOMINAL,'0')
                 press(Keys.TAB)
                 write(entries[n][4])
 
         entries.clear()
-        click('Post', t=1.5+t)
+        click('Post')
+        wait('Cancel Entry')
+
         try:
             click('Save')
+
         except:
-            wait('Edit', button)
+            wait('Edit')
+
         click('Print')
         click('Journal Entries')
 
@@ -260,30 +306,38 @@ def AGL(mode=None):
         for project in entries:
             auto_entries(project)
 
-def AGS():
-    AGL(mode='salary')
+def AGS(): AGL(mode=SALARY)
 
+#-------------------------------------------------------------------------------
 
 def write_kasbon(kasbon, mode):
 
-    if (mode != 'responsibility'):
-        driver.find_element_by_xpath("//a[@data-menu='185']/span").click()
-    else:
+    if (mode == BALANCE_RECEIVABLE or
+        mode == BALANCE_PAYABLE or
+        mode == BALANCE):
         driver.find_element_by_xpath("//a[@data-menu='186']/span").click()
-    wait('Import', button)
+    else:
+        driver.find_element_by_xpath("//a[@data-menu='185']/span").click()
 
-    driver.find_element_by_class_name("o_searchview_input").click()
-    sleep(0.25+t)
-    write(kasbon)
-    sleep(0.5+t)
-    press(Keys.ENTER)
-    sleep(1+t)
+    wait('Import')
 
-    kasbon = driver.find_element_by_xpath("//tr[@class='o_data_row']/td[2]")
-    if (kasbon.text[-2:] == '20') or  (kasbon.text[-2:] == '21'):
-        kasbon.click()
+    entry(kasbon, t=0.5+t)
 
-    wait('Edit', button)
+    temp = str(kasbon)
+    try:
+        kasbon = driver.find_element_by_xpath("//tr[@class='o_data_row']/td[2]")
+        if len(temp) != 15:
+            if (((kasbon.text[1:5] == temp) or (kasbon.text[:5] == temp)) and
+                (kasbon.text[-2:] == '21' or kasbon.text[-2:] == '20')):
+                kasbon.click()
+            else:
+                print("Warning: Check kasbon's number!")
+        else:
+            kasbon.click()
+    except:
+        pass
+
+    wait('Edit')
 
     project = driver.find_element_by_name('project_id').text
     partner = driver.find_element_by_name('employee_id').text
@@ -294,205 +348,195 @@ def write_kasbon(kasbon, mode):
 def edit_kasbon(mode):
 
     click('Edit')
-    if (mode == 'reimburse'):
-        click('Reimburse')
-    elif (mode == 'date'):
-        entry(date)
+
+    if (mode == SALARY or mode == GROSSUP):
+        entry(DATE)
+
+    click('Reimburse')
     click('Save')
 
 def submit_kasbon():
 
     click('Submit')
     wait('Kasbon Progress')
-    entry(date)
+    entry(DATE)
     click('OK')
 
-def pay_kasbon(mode, tax, project, company):
+def pay_kasbon(mode, project, company, TAX):
 
-    wait('Pay and Post', button)
-    if (tax):
+    wait('Pay and Post')
+
+    if (TAX):
         click('Edit')
-        wait('Edit', button)
+        wait('Edit')
+
     click('Pay and Post')
     wait('Kasbon Progress')
-
-    entry(date)
-    entry(bank, t = 0.75+t)
+    entry(DATE)
+    entry(BANK, t=0.5+t)
     if (company == 'PT SUA Sby'):
         if (project[0] == 'K'):
-            entry('1181-003', t = 0.75+t)
+            entry(DIFF_ACCOUNT, '1181-003', t=0.5+t)
         elif (project[0] == 'B'):
-            entry('1181-002', t = 0.75+t)
+            entry(DIFF_ACCOUNT, '1181-002', t=0.5+t)
     elif (project[0] != 'K'):
-        entry('1181-001', t = 0.75+t)
+        entry(DIFF_ACCOUNT, '1181-001', t=0.5+t)
     click('OK')
 
-def balance_kasbon(mode, project=None, status=None):
+def balance_kasbon(mode, project=None):
 
-    wait('Report Balancing', button)
+    wait('Report Balancing')
     click('Edit')
+
     for n in range(len(driver.find_elements_by_name('to_pay'))):
 
-        if ((mode == 'grossup') or (mode == 'labour')) and (project[0] != 'K'):
+        if ((mode == GROSSUP or mode == LABOUR)
+            and (project[0] != 'K')):
             driver.find_elements_by_css_selector("td:nth-child(4)")[n].click()
-            sleep(0.75+t)
+            sleep(1+t)
             write('6100-010')
-            sleep(0.75)
+            sleep(1+t)
             press(Keys.ENTER)
-            sleep(0.75)
-
-        elif (mode == 'modified'):
-            driver.find_elements_by_css_selector("td:nth-child(4)")[n].click()
-            sleep(0.75+t)
-            write('2170-009')
-            sleep(0.75)
-            press(Keys.ENTER)
-            sleep(0.75)
 
         driver.find_elements_by_css_selector("td:nth-child(9)")[n].click()
-        sleep(0.75+t)
+        sleep(1+t)
         write(driver.find_elements_by_name('to_pay')[n].text)
-        sleep(0.25)
 
-    if (mode != 'responsibility'):
+    if (mode != BALANCE_RECEIVABLE and
+        mode != BALANCE_PAYABLE and
+        mode != BALANCE):
         click('Save')
-
-    wait('Edit', button)
+    wait('Edit')
 
     click('Report Balancing')
     wait('Kasbon Progress')
-    entry(date)
+    entry(DATE)
     click('OK')
 
-    wait('Post Balance', button)
+    wait('Post Balance')
     click('Post Balance')
     wait('Kasbon Progress')
-    entry(date)
-    entry(bank, t = 0.75+t)
-    if (mode == 'responsibility'):
-        if (status == 'receivable'):
-            entry('1150-999', t = 0.75+t)
-        elif (status == 'payable'):
-            entry('2170-009', t = 0.75+t)
-        elif (status == 'bank'):
-            try:
-                entry('1112-101', t = 0.75+t)
-            except:
-                pass
+    entry(DATE)
+    entry(BANK, t=0.5+t)
+    if (mode == BALANCE_RECEIVABLE):
+        entry(DIFF_ACCOUNT,'1150-999', t=0.5+t)
+    elif (mode == BALANCE_PAYABLE):
+        entry(DIFF_ACCOUNT,'2170-009', t=0.5+t)
+    elif (mode == BALANCE):
+        entry(DIFF_ACCOUNT,'1112-101', t=0.5+t)
     click('OK')
 
-def print_kasbon(mode, partner, project, company, status=None):
+def print_kasbon(mode, partner, project, company, TAX=False):
 
-    WebDriverWait(driver,999).until(EC.presence_of_element_located(
-        (By.XPATH, "//body[@class='o_web_client']")))
+    wait('Entries')
 
     try:
+        if (mode == CASHOUT_PAYABLE or
+            mode == REIMBURSE_PAYABLE or
+            mode == BALANCE_RECEIVABLE or
+            mode == BALANCE_PAYABLE):
 
-        if (mode == 'co_indirect' or
-            mode == 're_indirect' or
-            mode == 'responsibility'):
-
-            if (mode == 'co_indirect'):
+            if mode == CASHOUT_PAYABLE:
                 nominal = driver.find_element_by_name('pay_total').text
-            elif (mode == 're_indirect'):
+            elif mode == REIMBURSE_PAYABLE:
                 nominal = driver.find_element_by_name('realize_total').text
-            elif (mode == 'responsibility'):
+            else:
                 nominal = driver.find_element_by_name('difference').text
             nominal = abs(int(nominal[:-3].replace(',','')))
 
-        sleep(0.5)
-
         click('Entries')
         wait('Journal Entry')
-        click(date)
+        click(DATE)
         wait('Accounting Documents')
-        click(journal)
+        click(JOURNAL)
         wait('Reference')
 
     except:
-        wait('Reverse Entry', button)
+        wait('Reverse Entry')
 
     label = driver.find_element_by_name('ref').text
 
-    if (mode == 'responsibility'):
-
-        if (status != 'bank') and company == 'PT SUA Jkt':
-            update_entries(status, partner, label, project, nominal)
+    if (mode == BALANCE_RECEIVABLE or mode == BALANCE_PAYABLE):
+        if (company == 'PT SUA Jkt'):
+            update_entries(mode, partner, label, project, nominal)
         else:
             pass
 
-    elif ((mode != 're_direct') or (entries)):
+    elif (mode != REIMBURSE or entries):
 
-        if ((mode == 'labour' or mode == 'salary') and
+        if ((mode == LABOUR or mode == SALARY) and
             (not (project in entries))):
             pass
 
         else:
 
+            click('Edit')
+            click('Cancel Entry')
+            wait('Post')
+            wait('Add an Item')
+
             try:
-                click('Edit')
-                click('Cancel Entry', 1.5+t*2)
-            except:
-                wait('Post', button)
-                sleep(1)
+                if (JOURNAL == 'BOK'):
+                    if (company == 'PT SUA Jkt'):
+                        click('01-1112-113')
+                    elif (company == 'PT SUA Sby'):
+                        click('02-1112-113')
 
-            if (journal == 'BOK'):
-                bank = 'BANK PERMATA SYARIAH'
-                if (company == 'PT SUA Jkt'):
-                    click('01-1112-113')
-                elif (company == 'PT SUA Sby'):
-                    click('02-1112-113')
-            elif (journal == 'BCK'):
-                bank = 'BANK BCA (JKT)'
-                if (company == 'PT SUA Jkt'):
-                    click('01-1112-101')
-                elif (company == 'PT SUA Sby'):
-                    click('02-1112-101')
+                elif (JOURNAL == 'BCK'):
+                    if (company == 'PT SUA Jkt'):
+                        click('01-1112-101')
+                    elif (company == 'PT SUA Sby'):
+                        click('02-1112-101')
 
-            if (mode == 'co_direct'):
-                entry('project', project, t=0.65)
-            elif (mode == 're_indirect' or mode == 'co_indirect'):
-                entry('account', '2170-009', t=0.65)
-                if (mode == 'co_indirect'):
-                    entry('project', project, t=0.65)
-                update_entries('payable', partner, label, project, nominal)
-            elif (mode == 'grossup'):
-                entry('account', '2133-001', t=0.65)
-            elif (mode == 'bpjsk'):
-                entry('account', '1121-001', t=0.65)
-                entry('partner', partner, t=0.35)
-                entry('label', label)
-                entry('project', project, t=0.65)
-            elif (mode == 'labour' or mode == 'salary'):
-                entry('nominal', '0')
-                press(Keys.TAB)
-                write(entries[project][-1])
-                auto_entries(project)
-            elif (mode == 'modified'):
-                entry('label', label)
+                if (mode == CASHOUT):
+                    entry(PROJECT, project, t=1+t)
 
-            if (mode == 'bpjsk' or mode == 'modified'):
-                wait('Cancel Entry', button)
-                sleep(1)
-            elif ((mode == 'co_direct' or mode == 're_direct') and
-                (entries)):
-                return
-            else:
-                click('Post', 1.5)
-                wait('Cancel Entry', button)
-                sleep(0.5)
-                try:
+                elif (mode == REIMBURSE_PAYABLE or mode == CASHOUT_PAYABLE):
+                    entry(ACCOUNT, '2170-009', t=1+t)
+                    if (mode == CASHOUT_PAYABLE):
+                        entry(PROJECT, project, t=1+t)
+                    update_entries(BALANCE_PAYABLE, partner, label, project, nominal)
+
+                elif (mode == GROSSUP):
+                    entry(ACCOUNT, '2133-001', t=1+t)
+
+                elif (mode == BPJS):
+                    entry(ACCOUNT, '2170-009', t=1+t)
+                    entry(PARTNER, 'GUNAKARYANA', t=1+t)
+                    entry(LABEL, DESC)
+                    entry(PROJECT ,'HO-21-0', t=1+t)
+
+                elif (mode == LABOUR or mode == SALARY):
+                    entry(NOMINAL, '0')
+                    press(Keys.TAB)
+                    write(entries[project][-1])
+                    auto_entries(project)
+
+                elif (mode == OTHERS):
+                    entry(LABEL, DESC)
+                    entry(PROJECT ,'HO-21-0', t=1+t)
+
+                if (mode == BPJS or mode == OTHERS):
+                    if (project[1:9] == 'HO-21-00'):
+                        AGL()
+                    wait('Cancel Entry')
+
+                elif ((mode == CASHOUT or mode == REIMBURSE or mode == BALANCE)
+                    and (entries)) or TAX:
+                    return
+
+                else:
+                    click('Post')
+                    wait('Cancel Entry')
                     click('Save')
-                except:
-                    wait('Edit', button)
 
-    if (mode != 'grossup' and mode != 'labour') or (company == 'PT SUA Sby'):
-            click('Print', 0.25)
+            except:
+                wait('Edit')
+
+    if ((mode != GROSSUP and mode != LABOUR) or company == 'PT SUA Sby'):
+            click('Print')
             click('Journal Entries')
             print(entries)
 
-    print('Current journal date: '+ date)
-
-    WebDriverWait(driver,999).until(EC.presence_of_element_located(
-        (By.XPATH, "//body[@class='o_web_client']")))
-    sleep(1+t)
+    print('Current journal date: '+ DATE)
+    wait('Post')
