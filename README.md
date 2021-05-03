@@ -1,2 +1,2 @@
 # AutoJournalKasbon
-Chrome GUI-Based Journal Automation in Odoo using Python3 with Selenium/Helim 
+Journal Automation (Chrome GUI-Based) using Python3 with Selenium/Helium 
