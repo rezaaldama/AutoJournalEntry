@@ -1,2 +1,2 @@
 # AutoJournalKasbon
-Journal Automation (Chrome GUI-Based) using Python3 with Selenium/Helium 
+Journal Entries Automation using Python3 with Selenium/Helium (Chrome GUI-Based) 
